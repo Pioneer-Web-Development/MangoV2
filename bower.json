@@ -1,0 +1,21 @@
+{
+  "name": "mango",
+  "version": "0.0.1",
+  "authors": [
+    "Joe Hansen <jhansen@pioneernewsgroup.com>"
+  ],
+  "description": "Newspaper Production Management",
+  "license": "Proprietary",
+  "homepage": "www.pioneernewsgroup.com",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "resources/assets/",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "eonasdan-bootstrap-datetimepicker": "~4.17.37"
+  }
+}

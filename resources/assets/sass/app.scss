@@ -1,0 +1,23 @@
+$padding:     20px;
+.pad-bottom {
+  padding-bottom: $padding;
+}
+.pad-top {
+  padding-top: $padding;
+}
+.dropdown-menu > li > form > .submitLink {
+  display: block;
+  padding: 3px 20px;
+  clear: both;
+  font-weight: 400;
+  line-height: 1.42857143;
+  color: #333;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  width:100%;
+  text-align:left;
+}
+.dropdown-menu > li > form > .submitLink:hover {
+  background-color: lighten(#000000, 93.5%);
+}
