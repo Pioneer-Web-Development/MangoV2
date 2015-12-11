@@ -29,6 +29,7 @@ class User
         /* pull in a reference to the global database variable (assumed to be $db */
         $this->localdb = $db;
         $this->user_token = $token;
+        $this->login();
     }
 
 
@@ -36,8 +37,7 @@ class User
     {
         global $session;
         /* look up the user in the users table by token */
-        $this->user = $this->localdb->from('users')->where("token",$this->user_token)->execute();
-
+        $user = $this->localdb->from('users')->where("token",$this->user_token)->fetch_first();
         $where = array(
                  'token' => $this->user_token
         );
@@ -46,18 +46,18 @@ class User
             'last_login' => date("Y-m-d H:i"),
             'last_online' => date("Y-m-d H:i")
         );
-        $this->localdb->where($where)->update('users', $data);
+        $this->localdb->where($where)->update('users', $data)->execute();
+        $this->userID = $user['id'];
+        $this->user = $user;
         $this->loggedin = true;
-        $this->userID = $this->user->id;
-
-        $session->loggedin = true;
+        $session->logged_in = true;
 
 
         /*
          * build up a variety of things that will be queried often
          */
-        $this->allowedSites = $this->localdb->select('site_id')->from('user_sites')->where('user_id',$this->userID)->fetch_simple_array();
-        $this->allowedPublications = $this->localdb->select('pub_id')->from('user_publications')->where('user_id',$this->userID)->where('value',1)->fetch_simple_array();
+        $this->allowedSites = $this->localdb->select('site_id')->from('user_sites')->where('user_id',$this->userID)->fetch_simple_array('site_id');
+        $this->allowedPublications = $this->localdb->select('pub_id')->from('user_publications')->where(array('user_id'=>$this->userID,'value'=>1))->fetch_simple_array('pub_id');
     }
 
     public function logout()

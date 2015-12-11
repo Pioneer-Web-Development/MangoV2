@@ -3,5 +3,4 @@
 function template_init()
 {
     page();
-    page_cleanup();
 }

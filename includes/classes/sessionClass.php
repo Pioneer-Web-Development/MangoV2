@@ -4,39 +4,31 @@
  */
 class Session
 {
+    private $messages = [];
+    private $data = [];
+    private $formErrors = [];
+    private $cookies = [];
+    private $base = [];
+
     function __construct()
     {
-        if(isset($_SESSION) && count($_SESSION)>0)
-        {
-            $this->setCookies();
-            $_SESSION['data']['new_session']=0;
-            $_SESSION['data']['last_page'] = $_SERVER['HTTP_REFERER'];
-        } else {
-            $_SESSION['data']=[];
-            $_SESSION['cookies']=[];
-            $_SESSION['messages']=[];
-            $_SESSION['formErrors']=[];
-            $_SESSION['base']=$_SESSION;
-            $_SESSION['server']=$_SERVER;
-            $_SESSION['data']['new_session']=1;
-        }
-        $_SESSION['data']['current_site'] = $this->getSiteCookie();
-    }
-
-
-    function __destruct()
-    {
-        $this->close();
+        $this->data = $_SESSION['data'];
+        $this->messages = $_SESSION['messages'];
+        $this->formErrors = $_SESSION['formErrors'];
+        $this->cookies = $_SESSION['cookies'];
+        $this->base = $_SESSION['base'];
     }
 
     public function setFlash($message)
     {
-        $_SESSION['messages'][]=$message;
+        $this->messages[]=$message;
     }
 
     public function getFlash()
     {
-        return $_SESSION['messages'];
+        $messages=$this->messages;
+        $this->messages = [];
+        return $messages;
     }
 
     public function queueCookie($type,$value,$remember=true,$delete=false)
@@ -49,14 +41,14 @@ class Session
         }
         if($delete){$time=time()-3600;}
         $cookie[$type]=array('value'=>$value,'time'=>$time);
-        $_SESSION['cookies']=array_merge($_SESSION['cookies'],$cookie);
+        $this->cookies=array_merge($this->cookies,$cookie);
     }
 
     public function setCookies()
     {
-        if(count($_SESSION['cookies'])>0)
+        if(count($this->cookies)>0)
         {
-            foreach($_SESSION['cookies'] as $cookieType=>$cookieValues)
+            foreach($this->cookies as $cookieType=>$cookieValues)
             {
                 switch($cookieType)
                 {
@@ -76,12 +68,15 @@ class Session
 
     public function getUser()
     {
-        if($_SESSION['data']['loggedin'])
+        if($this->logged_in)
         {
-            return $_SESSION['data']['user_token'];
+            return $this->user_token;
         } elseif(isset($_COOKIE['mango_user']))
         {
            return ($_COOKIE['mango_user']);
+        } elseif($this>user_token!='')
+        {
+           return ($this>user_token);
         }
         return 0;
     }
@@ -97,8 +92,8 @@ class Session
 
     public function __get($key)
     {
-        if (array_key_exists($key, $_SESSION['data'])) {
-            return $_SESSION['data'][$key];
+        if (array_key_exists($key, $this->data)) {
+            return $this->data[$key];
         } else {
             return "This key does not exist.";
         }
@@ -107,7 +102,7 @@ class Session
 
     public function __set($key,$value)
     {
-        $_SESSION['data'][$key] = $value;
+        $this->data[$key] = $value;
     }
 
     public function showSession()
@@ -115,32 +110,27 @@ class Session
         print "<div class='well col-md-12'>\n
         <h4>Session Data:</h4>
             <pre>";
-        print_r($_SESSION['data']);
+        print_r($this->data);
         print "    </pre>\n";
 
-        print "<h4>Server Data:</h4>
+       print "<h4>Form Errors:</h4>
         <pre>";
-        print_r($_SESSION['server']);
+        print_r($this->formErrors);
         print "    </pre>\n";
 
-        print "<h4>Form Errors:</h4>
+       print "<h4>Base:</h4>
         <pre>";
-        print_r($_SESSION['formErrors']);
+        print_r($this->base);
         print "    </pre>\n";
 
         print "<h4>Messages:</h4>
         <pre>";
-        print_r($_SESSION['messages']);
+        print_r($this->messages);
         print "    </pre>\n";
 
         print "<h4>Cookies:</h4>
         <pre>";
-        print_r($_SESSION['cookies']);
-        print "    </pre>\n";
-
-        print "<h4>Base Data:</h4>
-        <pre>";
-        print_r($_SESSION['base']);
+        print_r($this->cookies);
         print "    </pre>\n";
 
         print "</div>\n";
@@ -148,16 +138,15 @@ class Session
 
     public function setFormError($field,$message)
     {
-        $_SESSION['formErrors'][$field] = $message;
+        $this->formErrors[$field] = $message;
     }
 
     public function getFormErrors()
     {
-        if(count($_SESSION['formErrors'])>0)
+        if(count($this->formErrors)>0)
         {
-            $errors = $_SESSION['formErrors'];
-            $_SESSION['formErrors'] = []; //clear them now that they have been extracted to the Form class
-            print "fetched errors<br>";
+            $errors = $this->formErrors;
+            $this->formErrors = []; //clear them now that they have been extracted to the Form class
             return $errors;
         }
         return array();
@@ -176,6 +165,7 @@ class Session
 
     public function close()
     {
-        session_commit();
+        return array('formErrors'=>$this->formErrors,'cookies'=>$this->cookies,'data'=>$this->data,'messages'=>$this->messages, 'base'=>$this->base);
     }
+
 }

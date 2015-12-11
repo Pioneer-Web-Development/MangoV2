@@ -27,7 +27,7 @@ function includeScripts()
 /*
  * This function does all the clean up, closes files, discards unneeded memory, etc.
  */
-function page_cleanup()
+function page_cleanup($redirect='')
 {
     global $ajax, $post, $baseDir, $logger, $session;
 
@@ -35,7 +35,11 @@ function page_cleanup()
 
         include($baseDir."/templates/partials/debugger.php");
     }
-    $session->close();
+    $_SESSION = $session->close();
+    if($redirect!='')
+    {
+        redirect($redirect);
+    }
 }
 
 /* this adds a page title */

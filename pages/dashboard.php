@@ -5,18 +5,10 @@ include("../includes/bootstrap.php");
 
 function page()
 {
-    global $db,$user;
+    global $db,$user,$session;
+
     ?>
-
-        <h3>Dashboard</h3>
-    <p>Sites allowed:</p>
-    <pre>
-    <?php
-    $sites = $db->select('site_id')->from('user_sites')->where('user_id',$user->userID)->fetch_simple_array();
-    print $db->last_query();
-    print_r($sites);?>
-    </pre>
-
+    <h3>Dashboard</h3>
     <section id="widget-grid" class="">
 
             <!-- row -->

@@ -5,9 +5,9 @@
  * It will handle all the includes, page construction and output
  */
 session_start();
-
+$script = $_SERVER['SCRIPT_NAME'];
 $bootTime = time();
-$menuPath = str_replace("/pages/","",$_SERVER['SCRIPT_NAME']);
+$menuPath = str_replace("/pages/","",$script);
 
 $baseDir = $_SERVER['DOCUMENT_ROOT'].'/';
 $includesDir = $baseDir."includes/";
@@ -41,8 +41,6 @@ loadFiles($includesDir."/helpers");
 //include all class objects
 loadFiles($includesDir."/classes");
 
-$randomString = md5(microtime(TRUE) . rand(0, 100000));
-
 if(DISPLAY_DEBUG) {
     /* initialize the logger object */
     $logger = new Logger($bootTime);
@@ -56,23 +54,27 @@ else {
 $session = new Session();
 
 /* then initialize the user object if we have a user token */
-if($_SERVER['SCRIPT_NAME']!='logout.php') {
-    if ($session->getUser() || $session->loggedin) {
-        $user = new User($session->getUser(), $db);
+if($script!='/pages/user/logout.php' && $script!='/index.php') {
+    if ($session->getUser() || $session->logged_in==1) {
+        $userToken = $session->getUser();
+        $user = new User($userToken, $db);
+
     }
 }
 /* initialize the messenger object */
 $messenger = new Messenger();
 
 // before we do anything, if the user isn't logged in, let's redirect them to the index page (if they are NOT actually trying to log in at this moment
-if($session->loggedin == false && $_SERVER['SCRIPT_NAME']!='index.php' && !$post){
-    //redirect("/index.php");
-}
-if($session->loggedin && $_SERVER['PHP_SELF']=='/index.php')
+if(!$post && !$ajax)
 {
-    redirect('/pages/dashboard.php');
+    if ($script == '/index.php') {
+        //do nothing
+    } elseif ($session->logged_in != 1) {
+        redirect("/index.php");
+    } elseif ($session->logged_in == 1) {
+        //do nothing, we're logged in and on the page
+    }
 }
-
 /* initialize some variables */
 $scripts = array();
 
@@ -82,12 +84,11 @@ $sites = array(0=>'Global','1'=>'Idaho Press-Tribune', '2'=>'Idaho State Journal
 // now, based on if this is an ajax call or a POST, we load a template
 if(!$ajax && !$post && $template != '') {
 // load the correct page template if $template variable set in the booting script is not blank.
+    $session->csrf_token = md5(microtime(TRUE) . rand(0, 100000));
+    $expire = time() + 60 * 60 * 1;
+    $session->csrf_expire = $expire;
 
     //set up a csrf token for all standard pages by default
-    $session->csrf_token = $randomString;
-    $session->csrf_expire = time() + 60 * 60 * 1;
-    session_commit();
-
     if ($template != '') {
         //see if the file exists first, then load it
         $template = str_replace(".php", "", $template); //in case someone includes that piece
@@ -98,6 +99,7 @@ if(!$ajax && !$post && $template != '') {
         }
         if(function_exists('template_init')) {
             template_init();
+
         } else {
             die("Template does not have the required template_init function defined. Please correct before proceeding.");
         }
@@ -152,12 +154,10 @@ if(!$ajax && !$post && $template != '') {
 } elseif($ajax) {
     /* ajax request, we're just going to be responding with a json string */
     page();
-    page_cleanup();
 } elseif($post)
 {
     /* this is a POST */
     page();
-    page_cleanup();
 } elseif($template=='') {
     print "No template or page function defined for this url.";
 } else {
@@ -185,3 +185,5 @@ function loadFiles($folder){
 
     }
 }
+
+page_cleanup();

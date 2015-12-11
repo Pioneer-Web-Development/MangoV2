@@ -24,6 +24,8 @@ page_header() ?>
                 </ul>
                 <ul>Change Fields
                     <li>Change field: password | varchar (255) from (60) | nullable</li>
+                    <li>Change field: vision_data_sales_id | to sales_id</li>
+                    <li>Change field: vision_data_sales_name | to sales_name</li>
                 </ul>
                 <ul>Remove Fields
                     <li>businesscard_title</li>

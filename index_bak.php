@@ -71,49 +71,7 @@ function page()
                 </div>
                 <div class="col-xs-12 col-sm-12 col-md-5 col-lg-4">
                     <div class="well">
-                        <?php
-                        //$form = new Form();
-                        ?>
-                        <form class="form-horizontal" role="form" method="post" action="/pages/user/test.php">
-                            <?php
-                            //$form->showErrors(true);
-                            ?>
-                            <input type="text" name="token" size=38 value="<?php print $session->csrf_token ?>">
-                            <div class="form-group">
-                                <label class="col-md-4 control-label">E-Mail Address</label>
 
-                                <div class="col-md-8">
-                                    <input type="email" class="form-control" name="email" value="<?php print $_POST['email'] ?>">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="col-md-4 control-label">Password</label>
-
-                                <div class="col-md-8">
-                                    <input type="password" class="form-control" name="password">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <div class="col-md-6 col-md-offset-4">
-                                    <div class="checkbox">
-                                        <label>
-                                            <input type="checkbox" name="remember"> Remember Me
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <div class="col-md-6 col-md-offset-4">
-                                    <button type="submit" class="btn btn-primary">Login</button>
-
-                                    <a class="btn btn-link" href="/pages/user/forgot.php">Forgot Your
-                                        Password?</a>
-                                </div>
-                            </div>
-                        </form>
                     </div>
                 </div>
             </div>

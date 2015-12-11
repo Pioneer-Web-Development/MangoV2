@@ -17,5 +17,9 @@ function page()
     session_destroy();
     session_start();
     setcookie('mango_user',null,time()-3600);
+    print_r($_SESSION);
+    $_SESSION = $session->close();
+
+
     redirect("/index.php");
 }
