@@ -29,11 +29,10 @@ function page()
                     if ($result['token'] == '' || $result['token'] == Null) {
                         $token = generate_random_string(32);
                         $db->where('id', $result['id'])->update('users', array('token' => $token))->execute();
-
                     } else {
                         $token = $result['token'];
                     }
-                    $session->queueCookie('user', $token, $remember);
+                    $session->setCookie('user', $token, $remember);
                     $session->user_token = $token;
                     $session->logged_in = true;
                     $redirect = '/pages/dashboard.php';
@@ -49,7 +48,6 @@ function page()
                 page_cleanup("/index.php");
             }
         } else {
-
             $session->setFormError('email', 'There was a token mismatch. Hack attempt foiled.');
             page_cleanup("/index.php");
         }
@@ -57,6 +55,6 @@ function page()
         $session->setFormError('email', 'Timed out. Please don\'t let the form sit so long.');
         page_cleanup("/index.php");
     }
-    print "Session: ".$session->csrf_token."<br>Form: ".$_POST['csrf_token']."";
+    //print "Session: ".$session->csrf_token."<br>Form: ".$_POST['csrf_token']."";
 }
 

@@ -7,7 +7,7 @@ define( 'DB_USER', 'mangouser' );                               // set database 
 define( 'DB_PASS', '2rafar3aer#fdsD' );                         // set database password
 define( 'DB_NAME', 'mangodb' );                                 // set database name
 define( 'SEND_ERRORS_TO', 'jhansen@idahopress.com' );           //set email notification email address
-define( 'DISPLAY_DEBUG', false );                                //display  errors?
+define( 'DISPLAY_DEBUG', true );                                //display  errors?
 define( 'SERVER_NAME', 'http://'.$_SERVER['SERVER_NAME'].'/' ); //server name
 define( 'PAGE_BASE', 'pages' );
 
@@ -65,6 +65,8 @@ $producttypes=array("Broadsheet","Tab","Long Tab","Flexi");
 $leadtypes=array("Newspaper","Commercial");
 $balloontypes=array("NA"=>"NA","gear"=>"gear","operator"=>"operator");
 $laps=array("none"=>"none","lap"=>"lap","reverse"=>"reverse");
+
+
 /*
 if($prefs['folderNames']=='')
 {
@@ -104,7 +106,6 @@ if($dbPress['numrows']>1)
  ********************************************************/
 
 $touchscreenMenus=true; //not fully enabled, but future plans
-
 $enableJobStops=false; //enable capture/reporting of press stops at console
 $enableBenchmarks=false; //toggles reporting/capture of benchmarks
 /**********************************************************
@@ -192,19 +193,6 @@ if ($dbPubs['numrows']>0)
     foreach($dbPubs['data'] as $pub)
     {
         $pubs[$pub['id']]=$pub['pub_name'];
-    }
-}
-
-//get sites
-$sql="SELECT * FROM core_sites";
-$dbSites=dbselectmulti($sql);
-$sites=array();
-$sites[0]="Please choose";
-if ($dbSites['numrows']>0)
-{
-    foreach($dbSites['data'] as $site)
-    {
-        $sites[$site['id']]=$site['site_name'];
     }
 }
 

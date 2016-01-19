@@ -58,27 +58,8 @@ page_header() ?>
     </ul>
 </div>
 <h2 id="markdown-header-usage">Usage</h2>
-<p>To use this class, import it to your project</p>
-<div class="codehilite"><pre><span class="cp">&lt;?php</span>
-
-<span class="k">require_once</span> <span class="s1">&#39;class.database.php&#39;</span> <span class="p">;</span>
-</pre></div>
-
-
-<p>Once the class file is included, initialize it</p>
-<div class="codehilite"><pre><span class="cp">&lt;?php</span>
-
-<span class="nv">$db</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Database</span><span class="p">(</span><span class="nv">$host</span><span class="p">,</span> <span class="nv">$username</span><span class="p">,</span> <span class="nv">$password</span><span class="p">,</span> <span class="nv">$database</span><span class="p">);</span>
-</pre></div>
-
-
-<p>If your MySQL installation is using a non standard port, you can specify the port as </p>
-<div class="codehilite"><pre><span class="cp">&lt;?php</span>
-
-<span class="nv">$db</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Database</span><span class="p">(</span><span class="nv">$host</span><span class="p">,</span> <span class="nv">$username</span><span class="p">,</span> <span class="nv">$password</span><span class="p">,</span> <span class="nv">$database</span><span class="p">,</span> <span class="nv">$port</span><span class="p">);</span>
-</pre></div>
-
-
+<p>This class is auto-imported at application boot</p>
+<p>After boot, the class is automatically initialized and assigned to $db. If DISPLAY_DEBUG is set in the mangoConfig.php file, it is passed a logger class as well.</p>
 <p>If you are going to use a table prefix, you can assign it as </p>
 <div class="codehilite"><pre><span class="cp">&lt;?php</span>
 
@@ -97,10 +78,21 @@ page_header() ?>
 
 <span class="nv">$sql</span> <span class="o">=</span> <span class="s2">&quot;SELECT * FROM table&quot;</span> <span class="p">;</span>
 <span class="nv">$db</span><span class="o">-&gt;</span><span class="na">query</span><span class="p">(</span><span class="nv">$sql</span><span class="p">)</span> <span class="p">;</span>
-</pre></div>
+</pre>
+</div>
 
 
-<h2 id="markdown-header-get-only-the-first-row-db-query_first">Get only the first row : $db-&gt;query_first()</h2>
+<h2 id="markdown-header-select-query">Enable Caching</h2>
+<p>PHP Fast Cache has been integrated into this database layer to automatically cache database queries when enabled</p>
+    <p>Pass in a unique cache name and the system will automatically either cache the results for a default of 24 hours (or value passed in in seconds) or retrieve the cached results</p>
+<ol>
+    <li>$db->enable_cache(cache_name [required], cache_time[optional, default 3600*24 seconds])</li>
+    <li>$db->disable_cache()</li>
+</ol>
+
+
+
+    <h2 id="markdown-header-get-only-the-first-row-db-query_first">Get only the first row : $db-&gt;query_first()</h2>
 <p>query_first() can be used to get the first row of the query. </p>
 <div class="codehilite"><pre><span class="cp">&lt;?php</span>
 

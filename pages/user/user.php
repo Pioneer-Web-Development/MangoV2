@@ -13,7 +13,7 @@ function page()
     if($_GET['id']){
         //build up a user
         $userid=intval($_GET['id']);
-        $user=$db->from('users')->where('id',$userid)->fetch();
+        $user=$db->from('users')->where('id',$userid)->fetch_first();
     }
 
     //build up all the bits we need for dropdowns

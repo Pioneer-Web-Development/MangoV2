@@ -1,7 +1,7 @@
 <?php
+
+
 /*
- * Logger class to collect error, calls, output from all processes
- */
 class Logger
 {
     private $startTime;
@@ -15,15 +15,9 @@ class Logger
     private $files = [];
     private $cookies = [];
 
-    function __construct($bootTime = Null)
+    function __construct()
     {
-        if($bootTime == Null)
-        {
-            $this->startTime=$bootTime;
-        } else {
-            $this->startTime=microtime();
-        }
-
+        $this->startTime=$_SERVER['HTTP_REFERER'];
         //grab all available data
         $this->postData = $_POST;
         $this->getData = $_GET;
@@ -50,3 +44,4 @@ class Logger
         print "</pre>\n";
     }
 }
+*/

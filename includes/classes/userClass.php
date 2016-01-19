@@ -21,13 +21,11 @@ class User
     private $allowedPublications = [];
     private $user_token;
     private $user;
-    private $localdb;
 
 
     function __construct($token,Database $db)
     {
         /* pull in a reference to the global database variable (assumed to be $db */
-        $this->localdb = $db;
         $this->user_token = $token;
         $this->login();
     }
@@ -35,9 +33,9 @@ class User
 
     public function login()
     {
-        global $session;
+        global $session, $db;
         /* look up the user in the users table by token */
-        $user = $this->localdb->from('users')->where("token",$this->user_token)->fetch_first();
+        $user = $db->from('users')->where("token",$this->user_token)->fetch_first();
         $where = array(
                  'token' => $this->user_token
         );
@@ -46,7 +44,7 @@ class User
             'last_login' => date("Y-m-d H:i"),
             'last_online' => date("Y-m-d H:i")
         );
-        $this->localdb->where($where)->update('users', $data)->execute();
+        $db->where($where)->update('users', $data)->execute();
         $this->userID = $user['id'];
         $this->user = $user;
         $this->loggedin = true;
@@ -56,12 +54,17 @@ class User
         /*
          * build up a variety of things that will be queried often
          */
-        $this->allowedSites = $this->localdb->select('site_id')->from('user_sites')->where('user_id',$this->userID)->fetch_simple_array('site_id');
-        $this->allowedPublications = $this->localdb->select('pub_id')->from('user_publications')->where(array('user_id'=>$this->userID,'value'=>1))->fetch_simple_array('pub_id');
+        $db->reset_where();
+        $this->messageCount = $db->select('id')->from('user_messages')->where('user_id',$this->userID)->execute()->affected_rows;
+        $db->reset_where();
+        $this->allowedSites = $db->select('site_id')->from('user_sites')->where('user_id',$this->userID)->fetch_simple_array('site_id');
+        $db->reset_where();
+        $this->allowedPublications = $db->select('pub_id')->from('user_publications')->where(array('user_id'=>$this->userID,'value'=>1))->fetch_simple_array('pub_id');
     }
 
     public function logout()
     {
+        global $db;
         $where = array(
             'token' => $this->user_token
         );
@@ -69,7 +72,7 @@ class User
             'online' => 0,
             'last_online' => date("Y-m-d H:i")
         );
-        $this->localdb->where($where)->update('users', $data);
+        $db->where($where)->update('users', $data);
 
         $this->loggedin = false;
 

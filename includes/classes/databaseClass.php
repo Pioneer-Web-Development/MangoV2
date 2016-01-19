@@ -48,6 +48,10 @@ class Database
     private $logIt = false;
     private $logMessage = '';
 
+    private $cache = false;
+    private $cacheName = '';
+    private $cacheTime = 84600;
+
     /**
      * The table name used as FROM
      */
@@ -65,8 +69,7 @@ class Database
     private $array_join = array();
     private $debug_array = array();
 
-    private $logger; //passed in as a reference to the Logger Class
-    public function __construct(Logger $logger = Null)
+    public function __construct()
     {
         $port = 3306;
         // Get the default port number if not given.
@@ -79,10 +82,6 @@ class Database
         self::$_instance = $this;
         $this->debug_array = array( 'host' => DB_HOST, 'username' => DB_USER, 'database' => DB_NAME );
 
-        if($logger != null)
-        {
-            $this->logger = $logger; //reference to Logger class
-        }
     }
 
     /**
@@ -324,6 +323,29 @@ class Database
     }
 
     /**
+     * Enables caching
+     *
+     */
+    function enable_cache($cacheName,$cacheTime=86400)
+    {
+        $this->cache = true;
+        $this->cacheName = $cacheName;
+        $this->cacheTime = $cacheTime;
+        return $this;
+    }
+
+    /**
+     * Disables caching.
+     */
+    function disable_cache()
+    {
+        $this->cache = true;
+        $this->cacheName = '';
+        $this->cacheTime = 86400;
+        return $this;
+    }
+
+    /**
      * The SELECT portion of the query.
      *
      * @param $select Can either be a string or an array containing the columns to be
@@ -511,35 +533,55 @@ class Database
 
     public function execute()
     {
-        $this->prepare();
-        if ($this->_dryrun == true) {
-            $q = $this->_query;
-            $this->reset();
-            $this->_query = $q;
-            $this->_dryrun = true;
+        global $debugbar, $cache; // must be consistent in naming!
 
-            return $this;
-        }
-        if($this->logger != null)
+        //only going to run this IF caching is false, or if there is no cache
+        $fire = false;
+
+        if($this->cache == false)
         {
-            $this->logger->logQuery($this->_query);
+            $fire = true;
+        } else {
+            $name = $this->cacheName;
+            $cachedData = $cache->$name;
+            if($cachedData == null) {
+                $fire = true;
+            }
         }
-        $this->_result = $this->_mysqli->query($this->_query);
 
-        if (!$this->_result)
-            $this->error();
+        if($fire) {
+            $this->prepare();
+            if ($this->_dryrun == true) {
+                $q = $this->_query;
+                $this->reset();
+                $this->_query = $q;
+                $this->_dryrun = true;
 
-        $this->affected_rows = $this->_mysqli->affected_rows;
-        $this->_last_query = $this->_query;
+                return $this;
+            }
+            if (DISPLAY_DEBUG) {
+                $debugbar['database']->addMessage($this->_query);
+            }
 
-        if($this->logIt)
-        {
-            $this->executeLog();
+            $this->_result = $this->_mysqli->query($this->_query);
+
+            if (!$this->_result)
+                $this->error();
+
+            $this->affected_rows = $this->_mysqli->affected_rows;
+            $this->_last_query = $this->_query;
+
+            if ($this->logIt) {
+                $this->executeLog();
+            }
+
+            if ($this->cache && DISPLAY_DEBUG) {
+                $debugbar['database']->addMessage("Cached " . $this->_query . " to $name");
+            }
         }
 
         $this->reset();
         $this->_executed = true;
-
         return $this;
     }
 
@@ -550,23 +592,42 @@ class Database
      */
     public function fetch()
     {
+        global $debugbar, $cache;
         if ($this->_executed == false || !$this->_query)
             $this->execute();
 
-        if (is_object($this->_result)) {
-            $this->_executed = false;
-            // Checks whether fetch_all method is available. It is available only with MySQL
-            // Native Driver.
-            if (method_exists('mysqli_result', 'fetch_all')) {
-                $results = $this->_result->fetch_all(MYSQLI_ASSOC);
-            } else {
-                for ($results = array(); $tmp = $this->_result->fetch_array(MYSQLI_ASSOC);)
-                    $results[] = $tmp;
-            }
+        $name = $this->cacheName;
+        $cachedData = $cache->$name;
+        if($cachedData == null) {
 
-            return $results;
+            if (is_object($this->_result)) {
+                $this->_executed = false;
+                // Checks whether fetch_all method is available. It is available only with MySQL
+                // Native Driver.
+                if (method_exists('mysqli_result', 'fetch_all')) {
+                    $results = $this->_result->fetch_all(MYSQLI_ASSOC);
+                } else {
+                    for ($results = array(); $tmp = $this->_result->fetch_array(MYSQLI_ASSOC);)
+                        $results[] = $tmp;
+                }
+
+                //cache the results
+                if ($this->cache) {
+                    $name = $this->cacheName;
+                    $cache->set($name, $results, $this->cacheTime);
+
+                    $this->cache = false;
+                    $this->cacheName = '';
+                }
+                return $results;
+            } else {
+                $this->error('Unable to perform fetch()');
+            }
         } else {
-            $this->error('Unable to perform fetch()');
+            $debugbar['database']->addMessage("Pulled " . $this->_query . " from cache ".$this->cacheName);
+            $this->cache = false;
+            $this->cacheName = '';
+            return $cachedData;
         }
 
     }
@@ -578,31 +639,52 @@ class Database
      */
     public function fetch_as_select_options($field,$id='id')
     {
+        global $cache, $debugbar;
         if ($this->_executed == false || !$this->_query)
             $this->execute();
 
-        if (is_object($this->_result)) {
-            $this->_executed = false;
-            // Checks whether fetch_all method is available. It is available only with MySQL
-            // Native Driver.
-            if (method_exists('mysqli_result', 'fetch_all')) {
-                $results = $this->_result->fetch_all(MYSQLI_ASSOC);
-            } else {
-                for ($results = array(); $tmp = $this->_result->fetch_array(MYSQLI_ASSOC);)
-                    $results[] = $tmp;
-            }
-            $options=array();
-            // convert to options
-            if(count($results)>0)
-            {
-                foreach($results as $record)
-                {
-                    $options[$record[$id]]=$record[$field];
+        $name = $this->cacheName;
+        $cachedData = $cache->$name;
+        if($cachedData == null) {
+
+            if (is_object($this->_result)) {
+                $this->_executed = false;
+                // Checks whether fetch_all method is available. It is available only with MySQL
+                // Native Driver.
+                if (method_exists('mysqli_result', 'fetch_all')) {
+                    $results = $this->_result->fetch_all(MYSQLI_ASSOC);
+                } else {
+                    for ($results = array(); $tmp = $this->_result->fetch_array(MYSQLI_ASSOC);)
+                        $results[] = $tmp;
                 }
+                $options=array();
+                // convert to options
+                if(count($results)>0)
+                {
+                    foreach($results as $record)
+                    {
+                        $options[$record[$id]]=$record[$field];
+                    }
+                }
+
+                //cache the results
+                if ($this->cache) {
+                    $name = $this->cacheName;
+                    $cache->set($name, $options, $this->cacheTime);
+
+                    $this->cache = false;
+                    $this->cacheName = '';
+                }
+
+                return $options;
+            } else {
+                $this->error('Unable to perform fetch()');
             }
-            return $options;
         } else {
-            $this->error('Unable to perform fetch()');
+            $debugbar['database']->addMessage("Pulled from cache ".$this->cacheName);
+            $this->cache = false;
+            $this->cacheName = '';
+            return $cachedData;
         }
 
     }
@@ -614,33 +696,54 @@ class Database
      */
     public function fetch_simple_array($field)
     {
+        global $cache, $debugbar;
+
         if ($this->_executed == false || !$this->_query)
             $this->execute();
 
-        if (is_object($this->_result)) {
-            $this->_executed = false;
-            // Checks whether fetch_all method is available. It is available only with MySQL
-            // Native Driver.
-            if (method_exists('mysqli_result', 'fetch_all')) {
-                $results = $this->_result->fetch_all(MYSQLI_ASSOC);
-            } else {
-                for ($results = array(); $tmp = $this->_result->fetch_array(MYSQLI_ASSOC);)
-                    $results[] = $tmp;
-            }
-            $options=array();
-            // convert to options
-            if(count($results)>0)
-            {
-                foreach($results as $record)
-                {
-                    $options[]=$record[$field];
-                }
-            }
-            return $options;
-        } else {
-            $this->error('Unable to perform fetch()');
-        }
+        $name = $this->cacheName;
+        $cachedData = $cache->$name;
+        if($cachedData == null) {
 
+            if (is_object($this->_result)) {
+                $this->_executed = false;
+                // Checks whether fetch_all method is available. It is available only with MySQL
+                // Native Driver.
+                if (method_exists('mysqli_result', 'fetch_all')) {
+                    $results = $this->_result->fetch_all(MYSQLI_ASSOC);
+                } else {
+                    for ($results = array(); $tmp = $this->_result->fetch_array(MYSQLI_ASSOC);)
+                        $results[] = $tmp;
+                }
+                $options=array();
+                // convert to options
+                if(count($results)>0)
+                {
+                    foreach($results as $record)
+                    {
+                        $options[]=$record[$field];
+                    }
+                }
+
+                //cache the results
+                if ($this->cache) {
+                    $name = $this->cacheName;
+                    $cache->set($name, $options, $this->cacheTime);
+
+                    $this->cache = false;
+                    $this->cacheName = '';
+                }
+
+                return $options;
+            } else {
+                $this->error('Unable to perform fetch()');
+            }
+        } else {
+            $debugbar['database']->addMessage("Pulled from cache ".$this->cacheName);
+            $this->cache = false;
+            $this->cacheName = '';
+            return $cachedData;
+        }
     }
 
     /**
@@ -650,16 +753,37 @@ class Database
      */
     public function fetch_first()
     {
+        global $cache, $debugbar;
+
         if ($this->_executed == false || !$this->_query)
             $this->execute();
 
-        if (is_object($this->_result)) {
-            $this->_executed = false;
-            $results = $this->_result->fetch_array(MYSQLI_ASSOC);
+        $name = $this->cacheName;
+        $cachedData = $cache->$name;
+        if($cachedData == null) {
 
-            return $results;
+            if (is_object($this->_result)) {
+                $this->_executed = false;
+                $results = $this->_result->fetch_array(MYSQLI_ASSOC);
+
+                //cache the results
+                if ($this->cache) {
+                    $name = $this->cacheName;
+                    $cache->set($name, $results, $this->cacheTime);
+
+                    $this->cache = false;
+                    $this->cacheName = '';
+                }
+
+                return $results;
+            } else {
+                $this->error('Unable to perform fetch_first()');
+            }
         } else {
-            $this->error('Unable to perform fetch_first()');
+            $debugbar['database']->addMessage("Pulled from cache ".$this->cacheName);
+            $this->cache = false;
+            $this->cacheName = '';
+            return $cachedData;
         }
     }
 
@@ -705,7 +829,7 @@ class Database
      * Inserts data into table.
      *
      * @param string $table Name of the table
-     * @param array  $data  The array which contains the coulumn name and values to be
+     * @param array  $data  The array which contains the column name and values to be
      *                      inserted.
      *
      * @return integer Returns the inserted id. ( mysqli->insert_id)
@@ -713,17 +837,71 @@ class Database
 
     public function insert($table, $data)
     {
+        global $cache;
+
         if (isset($this->table_prefixfix))
             $table = $this->table_prefix . $table;
 
         foreach ($data as $key => $value) {
             $keys[] = "`$key`";
-            if (strpos($value, '()') == true OR is_numeric($value))
+            if (is_numeric($value))
                 $values[] = "$value";
             else
                 $values[] = "'$value'";
         }
+
+        //always clear the cache when inserting a new record!
+        if($this->cache)
+        {
+            $cache->delete($this->cacheName);
+        }
+
         $this->_query = "INSERT INTO " . $table . " (" . implode(', ', $keys) . ") VALUES (" . implode(', ', $values) . ");";
+        $this->execute();
+
+        return $this->_mysqli->insert_id;
+    }
+
+    /**
+     * Does a Bulk inserts of data into table.
+     *
+     * @param string $table Name of the table
+     * @param array  $dataMultiple  The array which consists of multiple arrays which contains the column name
+     *                       and values to be inserted.
+     *
+     * @return integer Returns the inserted id. ( mysqli->insert_id)
+     */
+
+    public function bulk_insert($table, $dataMultiple)
+    {
+        global $cache;
+
+        if (isset($this->table_prefixfix))
+            $table = $this->table_prefix . $table;
+
+        $multipleInserts='';
+        foreach($dataMultiple as $data)
+        {
+            $keys=[];
+            $values=[];
+            foreach ($data as $key => $value) {
+                $keys[] = "`$key`";
+                if (is_numeric($value))
+                    $values[] = "$value";
+                else
+                    $values[] = "'$value'";
+            }
+            $insert = "(" . implode(', ', $values) . ")";
+            $multipleInserts.= $insert. ',';
+        }
+        $multipleInserts=rtrim($multipleInserts,',');
+
+        //always clear the cache when inserting a new record!
+        if($this->cache)
+        {
+            $cache->delete($this->cacheName);
+        }
+        $this->_query = "INSERT INTO " . $table . " (" . implode(', ', $keys) . ") VALUES ".$multipleInserts;
         $this->execute();
 
         return $this->_mysqli->insert_id;
@@ -747,6 +925,8 @@ class Database
 
     public function update($table, $data, $skipWhere = false)
     {
+        global $cache;
+
         if (count($this->array_wherein) == 0 AND count($this->array_where) == 0 AND $skipWhere == false) {
             $this->error('You must provide WHERE clause for UPDATE query. Add "false" as the 3rd parameter on UPDATE() to skip this.');
 
@@ -757,7 +937,7 @@ class Database
             $table = $this->table_prefix . $table;
 
         foreach ($data as $key => $val) {
-            if (strpos($val, '()') == true OR is_numeric($val))
+            if (is_numeric($val))
                 $valstr[] = "`$key`" . " = $val";
             else
                 $valstr[] = "`$key`" . " = '$val'";
@@ -768,13 +948,20 @@ class Database
             $this->_query .= " WHERE ";
             $this->_query .= implode(" ", $this->array_where);
         }
+
+        //always clear the cache when inserting a new record!
+        if($this->cache)
+        {
+            $cache->delete($this->cacheName);
+        }
+
         $this->execute();
 
         return $this;
     }
 
     /**
-     * Sync Join query. Must provider where() before calling this query.
+     * Sync Join query. Must provide where() before calling this query.
      *  This function will delete all records with the matching id, then create new records for a join (xref) table
      * @param $table     string Name of the table
      * @param $data      string Array containing the data to be updated
@@ -784,6 +971,8 @@ class Database
 
     public function sync_join($table, $data)
     {
+        global $cache;
+
         if (count($this->array_wherein) == 0 AND count($this->array_where) == 0) {
             $this->error('You must provide WHERE clause for SYNC query.');
 
@@ -803,6 +992,13 @@ class Database
             else
                 $values[] = "'$value'";
         }
+
+        //always clear the cache when inserting a new record!
+        if($this->cache)
+        {
+            $cache->delete($this->cacheName);
+        }
+
         $this->_query = "INSERT INTO " . $table . " (" . implode(', ', $keys) . ") VALUES (" . implode(', ', $values) . ");";
         $this->execute();
 
@@ -1382,7 +1578,7 @@ class Database
 
     private function executeLog()
     {
-         //turn off logIt so the logging doesn't become recursive
+        //turn off logIt so the logging doesn't become recursive
         $this->logIt = false;
         $this->reset();
         if($GLOBALS['user']!=''){

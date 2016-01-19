@@ -71,6 +71,9 @@ class Form
     private $openTab = '';
     private $openLegend = '';
     private $csrf_token = '';
+    private $tabOpen = false;
+    private $fieldsetOpen = false;
+    private $successURL = '';
 
     function __construct($formOptions=array())
     {
@@ -83,10 +86,11 @@ class Form
             'class' => 'form-horizontal',
             'sidebar' => true,
             'title' => '',
+            'successURL' => $_SERVER['PHP_SELF'], //default back to same page
             'description' => ''
         );
         if(isset($formOptions['data']) && count($formOptions['data'])>0) {
-            $this->formRecord = $formOptions['data'][0];
+            $this->formRecord = $formOptions['data'];
             unset($formOptions['data']); //remove data from form Options since we have it in a separate variable now
             $this->formMethod = "PATCH"; // updating the form
         } else {
@@ -99,8 +103,14 @@ class Form
 
         /* post trumps $formRecord data (basically if you post, and the form has to reload for some reason, the post data should take precedence */
         $this->formData = array_merge($this->formRecord,$_POST);
+        /* post trumps $formRecord data (basically if you post, and the form has to reload for some reason, the session old post data should take precedence */
+        if(isset($session->oldPost) && count($session->oldPost)>0)
+        {
+            $this->formData = array_merge($this->formRecord,$session->oldPost);
+            $session->oldPost = [];
+        }
         $this->csrf_token = $session->csrf_token;
-
+        $this->successURL = $this->formOptions['successURL'];
         //grab any form errors from session and assign them
         $this->errors = $session->getFormErrors();
         $this->open();
@@ -198,7 +208,7 @@ class Form
         {
             $this->formHTML.= "<p>".$description."</p>\n";
         }
-        if(strpos($this->formOptions['action'],"/")>0)
+        if(substr($this->formOptions['action'],0,1)=='/')
         {
             //means we have a specific URL to go to
             $action=$this->formOptions['action'];
@@ -215,6 +225,7 @@ class Form
         $this->formHTML.="<input type='hidden' name='_method' id='_method' value='$this->formMethod' />\n";
         $this->formHTML.="<input type='hidden' name='csrf_token' id='csrf_token' value='$this->csrf_token' />\n";
         $this->formHTML.="<input type='hidden' name='_form_handler' id='_form_handler' value='$handler' />\n";
+        $this->formHTML.="<input type='hidden' name='_success_url' id='_success_url' value='$this->successURL' />\n";
         if($this->formMethod=='PATCH')
         {
             //did we pass in a recordID, if so use that instead
@@ -274,6 +285,8 @@ class Form
         {
             $this->formScripts[]="\$('#".$this->formDefaults['id']."').validator()\n";
         }
+
+        $GLOBALS['scripts']=array_merge($GLOBALS['scripts'],$this->formScripts);
     }
 
     public function generate()
@@ -281,42 +294,51 @@ class Form
         if(!$this->closed){$this->close();}
 
         echo $this->formHTML;
-
-
     }
+
     public function openTab($tabName)
     {
-        $this->openTab = $tabName;
-        $tab = strtolower(str_replace(" ","_",$tabName));
-
-        if($this->tabsHTML == '')
-        {
-            $this->tabsHTML = "<li role=\"presentation\" class=\"active\"><a href=\"#$tab\" aria-controls=\"$tab\" role=\"tab\" data-toggle=\"tab\">$tabName</a></li>\n";
-            $this->formHTML.="<div role=\"tabpanel\" class=\"tab-pane active container\" id=\"$tab\">\n";
-        } else {
-            $this->tabsHTML.= "<li role=\"presentation\"><a href=\"#$tab\" aria-controls=\"$tab\" role=\"tab\" data-toggle=\"tab\">$tabName</a></li>\n";
-            $this->formHTML.="<div role=\"tabpanel\" class=\"tab-pane container\" id=\"$tab\">\n";
+        if ($this->tabOpen == false) {
+            //only allow tab open when the last one is closed
+            $this->openTab = $tabName;
+            $tab = strtolower(str_replace(" ", "_", $tabName));
+            $this->tabOpen = true;
+            if ($this->tabsHTML == '') {
+                $this->tabsHTML = "<li role=\"presentation\" class=\"active\"><a href=\"#$tab\" aria-controls=\"$tab\" role=\"tab\" data-toggle=\"tab\">$tabName</a></li>\n";
+                $this->formHTML .= "<div role=\"tabpanel\" class=\"tab-pane active container\" id=\"$tab\">\n";
+            } else {
+                $this->tabsHTML .= "<li role=\"presentation\"><a href=\"#$tab\" aria-controls=\"$tab\" role=\"tab\" data-toggle=\"tab\">$tabName</a></li>\n";
+                $this->formHTML .= "<div role=\"tabpanel\" class=\"tab-pane container\" id=\"$tab\">\n";
+            }
         }
-
     }
 
     public function closeTab()
     {
-        $this->formHTML.="</div> <!-- closing tab for $this->openTab -->\n";
-        $this->openTab = '';
+        if($this->tabOpen) {
+            $this->formHTML .= "</div> <!-- closing tab for $this->openTab -->\n";
+            $this->openTab = '';
+            $this->tabOpen = false;
+        }
     }
 
     public function openFieldSet($legend)
     {
-        $this->formHTML.="<fieldset>\n";
-        $this->formHTML.="<legend>$legend</legend>\n";
-        $this->openLegend = $legend;
+        if ($this->fieldsetOpen == false) {
+            $this->formHTML .= "<fieldset>\n";
+            $this->formHTML .= "<legend>$legend</legend>\n";
+            $this->openLegend = $legend;
+            $this->fieldsetOpen = true;
+        }
     }
 
     public function closeFieldSet()
     {
-        $this->formHTML.="</fieldset>  <!-- closing fieldset for $this->openLegend -->\n";
-        $this->openLegend = '';
+        if($this->fieldsetOpen) {
+            $this->formHTML .= "</fieldset>  <!-- closing fieldset for $this->openLegend -->\n";
+            $this->openLegend = '';
+            $this->fieldsetOpen = false;
+        }
     }
 
     public function setSidebar($sidebar)
@@ -453,7 +475,7 @@ FORMELEMENT;
     function submit($options=array())
     {
         $this->submitButton = true;
-        $defaults = array('label'=>'Save','name'=>'submitButton','class'=>'default','disabled'=>'');
+        $defaults = array('label'=>'Save','name'=>'submitButton','class'=>'primary','disabled'=>'');
         $options=array_merge($defaults,$options);
         $onClick='';
         if(isset($options['onclick']) && $options['onclick']!=''){$onClick=" onClick = \"$options[onclick]\" ";}
@@ -468,84 +490,140 @@ FORMBUTTON;
 
     function text($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $field = $options['field'];
         $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$field]);
-        $value = htmlentities($this->formData[$field]);
-        $this->label_open($options);
+        $value = stripslashes($this->formData[$field]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'email', 'options' => $options['validation']));}
         //the actual text field
         $this->formHTML.="                <input type=\"text'\" class=\"form-control\" id=\"$field\" name=\"$field\" placeholder=\"$placeholder\" value=\"$value\" $validation>\n";
 
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     function textarea($options)
     {
-        $defaults = array('width'=>'100%','height'=>'10', 'editor'=>true);
+        $defaults = array('show_label'=>true, 'width'=>'100%','height'=>'10', 'editor'=>true);
         $options = array_merge($defaults,$options);
 
-        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
+        $placeholder = stripslashes(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
         $value = htmlentities($this->formData[$options['field']]);
-        $this->label_open($options);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'textarea', 'options' => $options['validation']));}
         //the actual text field
         $this->formHTML.="                <textarea class=\"form-control\" id=\"$options[field]\" name=\"$options[field]\"  $validation>$value</textarea>\n";
+        if($options['show_label']) {
+            $this->label_close();
+        }
+    }
 
-        $this->label_close();
+    function texteditor($options)
+    {
+        $defaults = array('show_label'=>true, 'width'=>'100%','height'=>'10', 'editor'=>true);
+        $options = array_merge($defaults,$options);
+
+        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
+        $value = stripslashes($this->formData[$options['field']]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        $validation = '';
+        if(isset($options['validation'])){$validation = $this->validation(array('type'=>'textarea', 'options' => $options['validation']));}
+        //the actual text field
+        $this->formHTML.="                <div id=\"$options[field]_editor\" >$value</div>\n";
+        $this->formHTML.="                <textarea id=\"$options[field]\" name=\"$options[field]\" style='display:none;'>$value</textarea>\n";
+        if($options['show_label']) {
+            $this->label_close();
+        }
 
         //see if it needs to be a summernote instance
-        if($options['editor'])
-        {
-            $this->formScripts[] = "\$('#$options[field]').summernote({
-  toolbar: [
-    ['style', ['bold', 'italic', 'underline', 'clear']],
-    ['font', ['strikethrough', 'superscript', 'subscript']],
-    ['fontsize', ['fontsize']],
-    ['color', ['color']],
-    ['para', ['ul', 'ol', 'paragraph']],
-    ['height', ['height']],
-  ]
-});\n";
-        }
+
+        $this->formScripts[] = "//initialize summernote text editor instances
+    \$('#$options[field]_editor').summernote({
+        callbacks: {
+            onBlur: function() {
+                var contents = $(this).summernote(\"code\");
+                $('#$options[field]').val(contents);
+            }
+        },
+        toolbar: [
+            ['style', ['bold', 'italic', 'underline', 'clear']],
+            ['font', ['strikethrough', 'superscript', 'subscript']],
+            ['fontsize', ['fontsize']],
+            ['color', ['color']],
+            ['para', ['ul', 'ol', 'paragraph']],
+            ['height', ['height']],
+        ],
+        minHeight: 150             // set minimum height of editor
+
+    });
+        ";
+
     }
 
     function email($options)
     {
-        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
-        $value = htmlentities($this->formData[$options['field']]);
-        $this->label_open($options);
-        $validation = '';
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+        $field = $options['field'];
+        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$field]);
+        $value = stripslashes($this->formData[$field]);
+
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+            $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'email', 'options' => $options['validation']));}
 
         //the actual text field
-        $this->formHTML.="                <input type=\"email\" class=\"form-control\" id=\"$options[field]\" name=\"$options[field]\" placeholder=\"$placeholder\" value=\"$value\" $validation>\n";
-
-        $this->label_close();
+        $this->formHTML.="                <input type=\"email\" class=\"form-control\" placeholder=\"$placeholder\" value=\"$value\" id=\"$options[field]\" name=\"$options[field]\" $validation>\n";
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     function phone($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
-        $value = $this->formatPhone($this->formData[$options['field']],'display');
-        $this->label_open($options);
+        $value = $this->formatPhone($this->formData[$options['field']],'display',$options['area_code']);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'email', 'options' => $options['validation']));}
 
         //the actual text field
         $this->formHTML.="                <input type=\"tel\" class=\"form-control\" id=\"$options[field]\" name=\"$options[field]\" placeholder=\"$placeholder\" value=\"$value\" $validation>\n";
-
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
         $this->formScripts[]="\$(\"#$options[field]\").mask(\"(999) 999-9999? x99999\");\n";
     }
 
     function password($options)
     {
-        $options = array_merge(array('confirm' => true), $options);
+        $defaults = array('show_label'=>true,'confirm' => true);
+        $options = array_merge($defaults,$options);
+
         $placeholder = htmlentities(isset($options['placeholder']) ? $options['placeholder'] : $this->formData[$options['field']]);
-        $value = htmlentities($this->formData[$options['field']]);
-        $this->label_open($options);
+        $value = stripslashes($this->formData[$options['field']]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
         if (isset($options['validation'])) {
             $validation = $this->validation(array('type' => 'password', 'options' => $options['validation']));
@@ -556,27 +634,37 @@ FORMBUTTON;
         if ($options['confirm']) {
             $this->formHTML .= "<div class='col-sm-6'><input type=\"text\" class=\"form-control col-sm-6\" id=\"$options[field]_confirm\" name=\"$options[field]_confirm\" placeholder=\"Confirm\" value=\"\" data-match=\"$options[field]\" data-match-error='Passwords do not match'></div>\n";
         }
-
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     function number($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
-        $value = htmlentities($this->formData[$options['field']]);
-        $this->label_open($options);
+        $value = stripslashes($this->formData[$options['field']]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
-        if(isset($options['validation'])){$validation = $this->validation(array('type'=>'email', 'options' => $options['validation']));}
+        if(isset($options['validation'])){$validation = $this->validation(array('type'=>'number', 'options' => $options['validation']));}
 
         //the actual text field
         $this->formHTML.="                <input type=\"number\" class=\"form-control\" id=\"$options[field]\" name=\"$options[field]\" placeholder=\"$placeholder\" value=\"$value\" $validation>\n";
-
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
 
     function date($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
         if($this->formData[$options['field']]!='')
         {
@@ -584,8 +672,9 @@ FORMBUTTON;
         } else {
             $value=date("m/d/Y",time());
         }
-
-        $this->label_open($options);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
 
         if(!(isset($options['validation']['defaultDate']))){
@@ -654,11 +743,16 @@ DATEDATA;
                 });\n
 DATEDATA;
         }
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     function time($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
         if($this->formData[$options['field']]!='')
         {
@@ -667,7 +761,9 @@ DATEDATA;
             $value=date("H:i",time());
         }
 
-        $this->label_open($options);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
 
         $validation = $this->validation(array('type'=>'date', 'options' => $options['validation']));
@@ -724,11 +820,16 @@ DATEDATA;
                 });\n
 DATEDATA;
         }
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     function datetime($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
         if($this->formData[$options['field']]!='')
         {
@@ -737,7 +838,9 @@ DATEDATA;
             $value=date("m/d/Y H:i",time());
         }
 
-        $this->label_open($options);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
 
         if(!(isset($options['validation']['defaultDate']))){
@@ -797,20 +900,27 @@ DATEDATA;
                 });\n
 DATEDATA;
         }
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
 
     function checkbox($options)
     {
-        $value = htmlentities($this->formData[$options['field']]);
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
+        $value = stripslashes($this->formData[$options['field']]);
 
         if(isset($options['description']))
         {
             $description = $options['description'];
             unset($options['description']);
         }
-        $this->label_open($options);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'email', 'options' => $options['validation']));}
         if($value){$value='checked';}else{$value='';}
@@ -822,7 +932,9 @@ DATEDATA;
                     <input type=\"hidden\" name=\"_check_$options[field]\" id=\"_check_$options[field]\" value=''>
                 </div>\n";
 
-        $this->label_close();
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     function label($options)
@@ -833,21 +945,33 @@ DATEDATA;
 
     function hidden($options)
     {
-        print "<input type='hidden' id='$options[id]' name='$options[id]' value='".htmlentities($options[value])."' />\n";
+        $value = stripslashes($this->formData[$options['field']]);
+        $this->formHTML.="    <input type='hidden' id='$options[field]' name='$options[field]' value='$value' />\n";
     }
 
     function select($options)
     {
-        $value = htmlentities($this->formData[$options['field']]);
-        $this->label_open($options);
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
+        $value = stripslashes($this->formData[$options['field']]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
         $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'select', 'options' => $options['validation']));}
         //the actual text field
-
-        $this->formHTML.="    <select class=\"form-control\" name=\"$options[field]\" id=\"$options[field]\" $validation>\n";
+        if($options['other']==true) {
+            $this->formHTML.="    <div class='row'><div class='col-sm-12 col-md-8'>";
+        }
+        $this->formHTML.="    <select class=\"form-control\" name=\"$options[field]\" id=\"$options[field]\" style=\"width:300px\" $validation>\n";
         // print out the <option> tags
         if(count($options['options'])>0)
         {
+            $this->formHTML.= "     <option value=''>Please select</option>\n";
+            if($options['other']==true) {
+                $this->formHTML .= "     <option value='_other'>Enter a new option</option>\n";
+            }
             foreach ($options['options'] as $option => $option_label) {
 
                 if ($option==$value) { //compare against key in options[data]
@@ -859,27 +983,224 @@ DATEDATA;
             }
         }
 
+        if($options['other']==true)
+        {
+            $this->formHTML.= "     <option value='_other'>Enter your own</option>\n";
+        }
         $this->formHTML.="        </select>\n";
-        $this->label_close();
+        if($options['other']==true)
+        {
+            $this->formHTML.= "     </div><div class='col-sm-12 col-md-4'>
+     <span id='_other_$options[field]_span' style='display:none;'><b>Other: </b><input type='text' class='form_control' name='_other_$options[field]' id='_other_$options[field]' /></span>
+     </div>
+     </div>\n";
+        }
+        if($options['show_label']) {
+            $this->label_close();
+        }
         if(isset($options['remote']) && $options['remote'])
         {
-            //@TODO handle remote data sources
+            $this->formScripts[]="\$('#$options[field]').select2({
+             ajax: {
+                    url: '$options[url]'',
+                    method: 'POST',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                    return {
+                        q: params.term // search term
+                      };
+                    },
+                    processResults: function (data, page) {
+                    // parse the results into the format expected by Select2.
+                    // since we are using custom formatting functions we do not need to
+                    // alter the remote JSON data
+                    //console.log(data);
+                    return {
+                        results: data.results
+                      };
+                    },
+                    cache: true
+                  },
+                escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+                minimumInputLength: 3
+            });
+            ";
         } else {
             $this->formScripts[]="\$('#$options[field]').select2();\n";
         }
+        if($options['other']==true)
+        {
+            $this->formScripts[]="\$('#$options[field]').on('change',function(){
+                if(\$('#$options[field]').val()=='_other')
+                {
+                    \$('#_other_$options[field]_span').show();
+                } else {
+                    \$('#_other_$options[field]').val('');
+                    \$('#_other_$options[field]_span').hide();
+                }
+                console.log(\$('#$options[field]').val()=='_other');
+            })\n";
+        }
+    }
+
+    function state($options)
+    {
+        $states=array("AL"=>"Alabama",
+            "AK"=>"Alaska",
+            "AZ"=>"Arizona",
+            "AR"=>"Arkansas",
+            "CA"=>"California",
+            "CO"=>"Colorado",
+            "CT"=>"Connecticut",
+            "DE"=>"Deleware",
+            "DC"=>"District of Columbia",
+            "FL"=>"Florida",
+            "GA"=>"Georgia",
+            "GU"=>"Guam",
+            "HI"=>"Hawaii",
+            "ID"=>"Idaho",
+            "IL"=>"Illinois",
+            "IN"=>"Indiana",
+            "IA"=>"Iowa",
+            "KS"=>"Kansas",
+            "KY"=>"Kentucky",
+            "LA"=>"Louisiana",
+            "ME"=>"Maine",
+            "MD"=>"Maryland",
+            "MA"=>"Massachusetts",
+            "MI"=>"Michigan",
+            "MN"=>"Minnesota",
+            "MS"=>"Mississippi",
+            "MO"=>"Missoui",
+            "MT"=>"Montana",
+            "NE"=>"Nebraska",
+            "NV"=>"Nevada",
+            "NH"=>"New Hampshire",
+            "NJ"=>"New Jersey",
+            "NM"=>"New Mexico",
+            "NY"=>"New York",
+            "NC"=>"North Carolina",
+            "ND"=>"North Dakota",
+            "OH"=>"Ohio",
+            "OK"=>"Oklahoma",
+            "OR"=>"Oregon",
+            "PW"=>"Palau",
+            "PA"=>"Pennsylvania",
+            "PR"=>"Puerto Rico=",
+            "RI"=>"Rhode Island",
+            "SC"=>"South Carolina",
+            "SD"=>"South Dakota",
+            "TN"=>"Tennessee",
+            "TX"=>"Texas",
+            "UT"=>"Utah",
+            "VT"=>"Vermont",
+            "VA"=>"Virginia",
+            "VI"=>"Virgin Islands",
+            "WA"=>"Washington",
+            "WV"=>"West Virginia",
+            "WI"=>"Wisconsin",
+            "WY"=>"Wyoming"
+        );
+        $options['options']=$states;
+        $this->select($options);
     }
 
     function selectChain($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
 
+
+        $value = stripslashes($this->formData[$options['field']]);
+        $value2 = stripslashes($this->formData[$options['field_2']]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+
+
+        //the first select field
+        $this->formHTML.="    <div class='row'>\n        <div class='col-sm-12 col-md-4'>";
+        $this->formHTML.="        <select class=\"form-control\" name=\"$options[field]\" id=\"$options[field]\">\n";
+        // print out the <option> tags
+        if(count($options['options'])>0)
+        {
+            $this->formHTML.= "     <option value=''>Please select</option>\n";
+            foreach ($options['options'] as $option => $option_label) {
+
+                if ($option==$value) { //compare against key in options[data]
+                    $sel=" selected";
+                } else {
+                    $sel='';
+                }
+                $this->formHTML.= "     <option value='". ($option) . "' $sel>" . ($option_label) . "</option>\n";
+            }
+        }
+        $this->formHTML.="        </select>\n";
+        $this->formHTML.="        </div>\n      <div class='col-sm-12 col-md-4'>\n";
+
+        $this->formHTML.="        <select class=\"form-control\" name=\"$options[field_2]\" id=\"$options[field_2]\">\n";
+        // print out the <option> tags
+        $bootstrap='';
+
+        if(count($options['options_2'])>0)
+        {
+            $bootstrap = " bootstrap : {\n";
+            $sel="'selected':";
+            $this->formHTML.= "     <option value='none'>Please select</option>\n";
+            foreach ($options['options_2'] as $option => $option_label) {
+
+                if ($option==$value2) { //compare against key in options[data]
+                    $sel.="'$value2'";
+                }
+                $bootstrap.="'$option':'$option_label',";
+                $this->formHTML.= "     <option value='". ($option) . "' $sel>" . ($option_label) . "</option>\n";
+            }
+            $bootstrap.="\n}\n";
+        }
+        $this->formHTML.="        </select>\n";
+        if($options['other']==true)
+        {
+            $this->formHTML.= "     </div><div class='col-sm-12 col-md-4'>
+     <span id='_other_$options[field_2]_span' style='display:none;'><b>Other: </b><input type='text' class='form_control' name='_other_$options[field_2]' id='_other_$options[field_2]' /></span>
+     </div>
+     </div>\n";
+        }
+        if($options['show_label']) {
+            $this->label_close();
+        }
+        $this->formScripts[]="\$('#$options[field_2]').remoteChained({
+        parents : '#$options[field]',
+        url : '$options[remote]',
+        $bootstrap
+    });\n";
+        $this->formScripts[]="\$('#$options[field]').select2();\n";
+        $this->formScripts[]="\$('#$options[field_2]').select2();\n";
+        if($options['other']==true)
+        {
+            $this->formScripts[]="\$('#$options[field_2]').on('change',function(){
+                if(\$('#$options[field_2]').val()=='_other')
+                {
+                    \$('#_other_$options[field_2]_span').show();
+                } else {
+                    \$('#_other_$options[field_2]').val('');
+                    \$('#_other_$options[field_2]_span').hide();
+                }
+            })\n";
+        }
     }
 
     function dualSelect($options)
     {
+        $defaults = array('show_label'=>true, 'nonSelectedLabel'=>'Non-selected','selectedLabel'=>'Selected');
+        $options = array_merge($defaults,$options);
+
         $values = $options['values'];
-        $this->label_open($options);
-        if(isset($options['nonSelectedLabel'])){$nonSelectedLabel=$options['nonSelectedLabel'];}else{$nonSelectedLabel='Non-selected';}
-        if(isset($options['selectedLabel'])){$selectedLabel=$options['selectedLabel'];}else{$selectedLabel='Selected';}
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        $nonSelectedLabel=$options['nonSelectedLabel'];
+        $selectedLabel=$options['selectedLabel'];
         $validation = '';
         if(isset($options['validation'])){$validation = $this->validation(array('type'=>'select', 'options' => $options['validation']));}
         //the actual text field
@@ -896,10 +1217,13 @@ DATEDATA;
                 }
                 $this->formHTML.= "     <option value='". ($option) . "'$sel>" . ($option_label) . "</option>\n";
             }
-        }
 
+        }
         $this->formHTML.="        </select>\n";
-        $this->label_close();
+
+        if($options['show_label']) {
+            $this->label_close();
+        }
         if($options['showFilter']){$showFilter="showFilterInputs: true,";}else{$showFilter="showFilterInputs: false,";}
         $this->formScripts[]="\$('#$options[field]').bootstrapDualListbox({
   nonSelectedListLabel: '$nonSelectedLabel',
@@ -910,58 +1234,145 @@ DATEDATA;
 });;\n";
     }
 
-    function remoteSelect($options)
-    {
-        $options['remote'] = true;
-        $this->select($options);
-
-       $this->formScripts[]=<<<REMOTESELECT
-        $("#$options[field]").select2({
-            ajax: {
-                url: "$options[url]",
-                method: 'POST',
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                   return {
-                      q: params.term // search term
-                  };
-                },
-                processResults: function (data, page) {
-                // parse the results into the format expected by Select2.
-                // since we are using custom formatting functions we do not need to
-                // alter the remote JSON data
-                    console.log(data);
-                  return {
-                    results: data.results
-                  };
-                },
-                cache: true
-              },
-              escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-              minimumInputLength: 3
-            });
-REMOTESELECT;
-
-    }
-
     function checkList($options)
     {
+        //@TODO needs to be completed!
+
+        $defaults = array('show_label'=>true,'columns'=>3);
+        $options = array_merge($defaults,$options);
+
+        $mdColWidth = ceil(12/$options['columns']); //this will be how many columns wide to made each check
+
+        $values = $options['values'];
+        $nonSelectedLabel=$options['nonSelectedLabel'];
+        $selectedLabel=$options['selectedLabel'];
+        $validation = '';
+        if(isset($options['validation'])){$validation = $this->validation(array('type'=>'select', 'options' => $options['validation']));}
+
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        //the actual checkbox fields
+        $this->formHTML.="<div class='row'>\n";
+        foreach($options['options'] as $checkID=>$checkDisplay)
+        {
+            if(in_array($checkID,$values)){$checked = 'checked';}else{$checked='';}
+            $this->formHTML.="<div class='col-sm-$mdColWidth'>\n";
+            $this->formHTML.="   <div class=\"checkbox\">
+    <label>
+      <input name='".$options['field']."[]' value='$checkID' type=\"checkbox\" $checked> $checkDisplay
+    </label>
+  </div>";
+            $this->formHTML.="</div>\n";
+        }
+        if($options['other']==true) {
+            $this->formHTML.="<div class='col-sm-$mdColWidth'>\n";
+            $this->formHTML.="<div class=\"checkbox\">
+    <label>
+      <input id='_other_$options[field]' type=\"checkbox\"> Other (please specify)
+    </label>
+  </div>";
+            $this->formHTML.="</div>\n";
+        }
+
+        $this->formHTML.="</div>\n";
+
+        if($options['other']==true)
+        {
+            $this->formHTML.= "     <div class='row'>
+         <div class='col-sm-12'>
+        <span id='_other_$options[field]_span' style='display:none;'><b>Other: </b>
+            <input type='text' class='form_control' name='_othercheck_$options[field]' id='_othercheck_$options[field]' />
+        </span>
+        </div>
+   </div>\n";
+        }
+
+        if($options['show_label']) {
+            $this->label_close();
+        }
+        if($options['other']==true)
+        {
+            $this->formScripts[]="\$('#_other_$options[field]').on('change',function(){
+                if(\$('#_other_$options[field]').prop('checked'))
+                {
+                    \$('#_other_$options[field]_span').show();
+                } else {
+                    \$('#_other_$options[field]').val('');
+                    \$('#_other_$options[field]_span').hide();
+                }
+            })\n";
+        }
 
     }
 
     function radioList($options)
     {
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
+        //@TODO needs to be completed!
+        $options=array_merge(array('columns'=>3,$options));
+        if($options['show_label']) {
+        }
+        if($options['other']==true)
+        {
+            $this->formHTML.= "     <br><input type='text' class='form_control' name='_other_$options[field]' id='_other_$options[field]' />\n";
+        }
 
     }
 
     function file($options)
     {
+        $defaults = array('show_label'=>true, 'preview'=>true,'createDirectory'=>true);
+        $options = array_merge($defaults,$options);
 
+        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$options['field']]);
+        $value = stripslashes($this->formData[$options['field']]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        $validation = '';
+        if(isset($options['validation'])){$validation = $this->validation(array('type'=>'file', 'options' => $options['validation']));}
+        //the actual field
+
+        if($options['createDirectory'])
+        {
+            if(!file_exists($options['uploadDirectory']))
+            {
+                mkdir($options['uploadDirectory']);
+            }
+        }
+        if($options['preview'])
+        {
+            $value = htmlentities($this->formData[$options['field']]);
+            if($value=='')
+            {
+                $src = '';
+            } else {
+                $img = $options['uploadDirectory']."/".$value;
+                $img = str_replace("//","/",$img);
+                $src = "<img src='$img' class='img-bordered' width=200 />";
+            }
+
+            $this->formHTML.="                <div class='row'><div class='col-md-4 col-sm-12'>$src</div><div class='col-md-8 col-sm-12'>";
+            $this->formHTML.="                <input type=\"file'\" class=\"form-control\" id=\"$options[field]\" name=\"$options[field]\" $validation>\n";
+            $this->formHTML.="                </div></div>";
+        } else {
+            $this->formHTML.="                <input type=\"file'\" class=\"form-control\" id=\"$options[field]\" name=\"$options[field]\" $validation>\n";
+        }
+
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
-    public function dropFile($options)
+    public function dropzone($options)
     {
+        //@TODO needs to be completed!
+        $defaults = array('show_label'=>true);
+        $options = array_merge($defaults,$options);
+
         $uploadHandler='';$deleteHandler='';$uploadDirectory='';$subDir='';$successUploadFunction='';$successDeleteFunction='';
         print "<form action='$uploadHandler' class='dropzone' id='dropzoneWidget'>
         <input type='hidden' id='uploadDirectory' name='uploadDirectory' value='$uploadDirectory' />
@@ -991,32 +1402,123 @@ REMOTESELECT;
             }");
     }
 
-    function form_slider($id,$label,$value,$explaintext='',$min=0,$max=100, $step=1)
+    function slider($options)
     {
-        ?>
-        <div class="form-group">
-            <label for="<?php echo $id ?>" class="col-sm-2 control-label"><?php echo $label ?></label>
-            <div class="col-sm-10">
-                <?php if($explaintext!=''){print "<small>$explaintext</small><br />";} ?>
-                <input id="<?php echo $id ?>" name="<?php echo $id ?>" data-slider-id='<?php echo $id ?>' type="text" data-slider-min="<?php echo $min ?>" data-slider-max="<?php echo $max ?>" data-slider-step="<?php echo $step ?>" data-slider-value="<?php echo $value ?>"/>
+        $defaults = array('show_label'=>true, 'min'=>1,'max'=>100,'step'=>1,'orientation'=>'horizontal','range'=>false,'value2'=>'');
+        $options = array_merge($defaults,$options);
 
-            </div>
-        </div>
+        $field = $options['field'];
 
-        <?php
-        $GLOBALS['inline_scripts'][]=array('origin'=>'Initiating a datetime picker with date only',
-            'script'=>"\$('#$id').bootstrapSlider({});");
+        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$field]);
+
+        $value = stripslashes($this->formData[$field]);
+        if($options['range']==true && $options['value2']!='')
+        {
+            $value2=stripslashes($options['value2']);
+            $value = "[$value,$value2]";
+        }
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        //the actual text field
+        $this->formHTML.="          <input id=\"$field\" name=\"$field\" type=\"text\" value=\"\"
+                       data-slider-id='$field'
+                       data-slider-orientation='$options[orientation]'
+                       data-slider-min=\"$options[min]\"
+                       data-slider-max=\"$options[max]\"
+                       data-slider-step=\"$options[step]\"
+                       data-slider-value=\"$value\"/>\n";
+        if($options['show_label']) {
+            $this->label_close();
+        }
+        $this->formScripts[]="\$('#$field').slider({});\n";
+
     }
 
-    function yesNoSwitch($options)
+    function yesNo($options)
     {
-        ?>
-        <span class="onoffswitch">
-            <input type="checkbox" name="onoffswitch" class="onoffswitch-checkbox" checked="checked" id="myonoffswitch">
-            <label class="onoffswitch-label" for="myonoffswitch"> <span class="onoffswitch-inner" data-swchon-text="YES" data-swchoff-text="NO"></span> <span class="onoffswitch-switch"></span>
-            </label>
-        </span>
-        <?php
+        $defaults = array('show_label'=>true, 'options'=>array(
+            array('label'=>'Label 1','value'=>'Value 1','default'=>true,'class'=>'primary'),
+            array('label'=>'Label 2','value'=>'Value 2','default'=>false,'class'=>'default')
+        ));
+        $options = array_merge($defaults,$options);
+
+        $field = $options['field'];
+        $value = htmlentities($this->formData[$field]);
+
+        $opt = $options['options'];
+
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        if($value!='')
+        {
+            if($opt[0]['value']==$value)
+            {
+                $check1 = 'checked';
+                $active1 = 'active';
+                $check2 = '';
+                $active2 = '';
+
+            }
+            if($opt[0]['value']==$value)
+            {
+                $check1 = '';
+                $active1 = '';
+                $check2 = 'checked';
+                $active2 = 'active';
+            }
+        } else {
+            if($opt[0]['default']==true)
+            {
+                $check1 = 'checked';
+                $active1 = 'active';
+                $check2 = '';
+                $active2 = '';
+            } else {
+                $check1 = '';
+                $active1 = '';
+                $check2 = 'checked';
+                $active2 = 'active';
+            }
+        }
+
+        //the actual text field
+        $this->formHTML.="
+                <div class=\"btn-group btn-toggle\" data-toggle=\"buttons\">
+                    <label class=\"btn btn-".$opt[0]['class']." $active1\">
+                        <input type=\"radio\" id=\"".$field."_0\" name=\"$field\" value=\"".$opt[0]['value']." $check1 \">". $opt[0]['label'] . "
+                    </label>
+                    <label class=\"btn btn-".$opt[1]['class']."\" $active2>
+                        <input type=\"radio\" id=\"".$field."_1\" name=\"$field\" value=\"".$opt[1]['value']." $check2 \">". $opt[1]['label'] . "
+                    </label>
+                </div>
+        \n";
+        if($options['show_label']) {
+           $this->label_close();
+        }
+    }
+
+    function color($options)
+    {
+        $defaults = array('show_label'=>true, 'default'=>'#ffffff');
+        $options = array_merge($defaults,$options);
+
+        $field = $options['field'];
+        $placeholder = htmlentities(isset($options['placeholder'])? $options['placeholder'] : $this->formData[$field]);
+
+        $value = htmlentities($this->formData[$field]);
+        if($options['show_label']) {
+            $this->label_open($options);
+        }
+        //the actual text field
+        $this->formHTML.="                 <div class='row'><div class='col-sm-12 col-md-4'><div class=\"input-group colorpicker\">
+                     <input type=\"text'\" class=\"form-control\" id=\"$field\" name=\"$field\" placeholder=\"$placeholder\" value=\"$value\" >
+                     <span class=\"input-group-addon\"><i></i></span>
+                 </div></div></div>\n";
+        if($options['show_label']) {
+            $this->label_close();
+        }
     }
 
     private function generateID()
@@ -1037,7 +1539,7 @@ REMOTESELECT;
         return $randstr;
     }
 
-    private function formatPhone($phone,$dir='display')
+    private function formatPhone($phone,$dir='display',$defaultAreaCode='000')
     {
         $phone=str_replace("(","",$phone);
         $phone=str_replace(")","",$phone);
@@ -1049,7 +1551,7 @@ REMOTESELECT;
             if(strlen($phone)<10)
             {
                 //no area code
-                $phone="000".substr($phone,0,3)."-".substr($phone,3);
+                $phone=$defaultAreaCode.substr($phone,0,3)."-".substr($phone,3);
             } else {
                 $phone="(".substr($phone,0,3).") ".substr($phone,3,3)."-".substr($phone,6,4)." x".substr($phone,10);
             }

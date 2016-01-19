@@ -39,8 +39,8 @@
 /*
  * GLOBAL: Sound Config (define sound path, enable or disable all sounds)
  */
-	$.sound_path = "sound/";
-	$.sound_on = true; 
+	$.sound_path = "/public/sound/";
+	$.sound_on = false;
 /*
  * SAVE INSTANCE REFERENCE (DO NOT CHANGE)
  * Save a reference to the global object (window in the browser)

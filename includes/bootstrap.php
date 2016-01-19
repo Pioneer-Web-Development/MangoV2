@@ -6,13 +6,18 @@
  */
 session_start();
 $script = $_SERVER['SCRIPT_NAME'];
-$bootTime = time();
 $menuPath = str_replace("/pages/","",$script);
-
 $baseDir = $_SERVER['DOCUMENT_ROOT'].'/';
 $includesDir = $baseDir."includes/";
 
+//load up the cache engine
+include($includesDir.'phpfastcache.php');
+phpFastCache::setup("storage","files");
+phpFastCache::setup("path", $baseDir.'cache/'); // Path For Files
+$cache = phpFastCache();
+
 // detect if this is an ajax page call
+
 if(!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
     $ajax = true;
 } else {
@@ -25,31 +30,58 @@ if($_POST)
 } else {
     $post = false;
 }
-
-
 include('mangoConfig.php');
+
+//load vendor autoload.php
+include($baseDir.'vendor/autoload.php');
+use \DebugBar\StandardDebugBar;
+
+
+//include all class objects
+$folder = $includesDir."/classes";
+$files = scandir($folder);
+foreach ($files as $filename)
+{
+    if($filename != "." && $filename != "..") {
+        if (strpos($filename, '.php') !== false) {
+            require $folder."/".$filename;
+        }
+    }
+}
 
 if(DISPLAY_DEBUG)
 {
+    ini_set("display_errors", 1);
+    ini_set("log_errors", true);
     error_reporting(E_WARNING && E_ERROR);
+    $debugbar = new StandardDebugBar();
+    $debugbar->addCollector(new \DebugBar\DataCollector\MessagesCollector('database'));
+    $debugbarRenderer = $debugbar->getJavascriptRenderer();
+    //Initialize a global $db object (and include the logger) once to lighten memory usage
+    $db = new Database($debugbar);
 } else {
+    ini_set("display_errors", 0);
+    ini_set("log_errors", true);
     error_reporting(0);
-}
-//include all helper functions
-loadFiles($includesDir."/helpers");
-
-//include all class objects
-loadFiles($includesDir."/classes");
-
-if(DISPLAY_DEBUG) {
-    /* initialize the logger object */
-    $logger = new Logger($bootTime);
-    /* always initialize the database */
-    $db = new Database($logger); //pass in the logger object as well
-}
-else {
+    //Initialize a global $db object once to lighten memory usage
     $db = new Database();
 }
+
+
+
+
+//include all helper functions
+$folder = $includesDir."/helpers";
+$files = scandir($folder);
+foreach ($files as $filename)
+{
+    if($filename != "." && $filename != "..") {
+        if (strpos($filename, '.php') !== false) {
+            require $folder."/".$filename;
+        }
+    }
+}
+
 /* initialize the session object */
 $session = new Session();
 
@@ -58,11 +90,8 @@ if($script!='/pages/user/logout.php' && $script!='/index.php') {
     if ($session->getUser() || $session->logged_in==1) {
         $userToken = $session->getUser();
         $user = new User($userToken, $db);
-
     }
 }
-/* initialize the messenger object */
-$messenger = new Messenger();
 
 // before we do anything, if the user isn't logged in, let's redirect them to the index page (if they are NOT actually trying to log in at this moment
 if(!$post && !$ajax)
@@ -78,17 +107,14 @@ if(!$post && !$ajax)
 /* initialize some variables */
 $scripts = array();
 
-$sites = array(0=>'Global','1'=>'Idaho Press-Tribune', '2'=>'Idaho State Journal');
-
 
 // now, based on if this is an ajax call or a POST, we load a template
 if(!$ajax && !$post && $template != '') {
 // load the correct page template if $template variable set in the booting script is not blank.
+    //set up a csrf token for all standard pages by default
     $session->csrf_token = md5(microtime(TRUE) . rand(0, 100000));
     $expire = time() + 60 * 60 * 1;
     $session->csrf_expire = $expire;
-
-    //set up a csrf token for all standard pages by default
     if ($template != '') {
         //see if the file exists first, then load it
         $template = str_replace(".php", "", $template); //in case someone includes that piece
@@ -99,7 +125,6 @@ if(!$ajax && !$post && $template != '') {
         }
         if(function_exists('template_init')) {
             template_init();
-
         } else {
             die("Template does not have the required template_init function defined. Please correct before proceeding.");
         }
@@ -163,27 +188,4 @@ if(!$ajax && !$post && $template != '') {
 } else {
     die ("Not sure how you got here.");
 }
-
-
-/* bootstrap functions */
-
-function loadFiles($folder){
-    //grab all the files in the specified directory
-    $files = scandir($folder);
-    foreach ($files as $filename)
-    {
-        if($filename != "." && $filename != "..") {
-            if (is_dir($filename)) {
-                //handle nesting
-                loadFiles($filename);
-            } else {
-                if (strpos($filename, '.php') !== false) {
-                    require $folder."/".$filename;
-                }
-            }
-        }
-
-    }
-}
-
 page_cleanup();

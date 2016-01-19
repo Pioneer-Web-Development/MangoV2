@@ -17,10 +17,34 @@ class Session
         $this->formErrors = $_SESSION['formErrors'];
         $this->cookies = $_SESSION['cookies'];
         $this->base = $_SESSION['base'];
+
+    }
+
+
+    public function setFlashSuccess($message)
+    {
+        if(!is_array($message))
+        {
+            $successMessage['title']='Success';
+            $successMessage['content']=$message;
+        }
+        $this->setFlash($successMessage);
     }
 
     public function setFlash($message)
     {
+        $defaults = array(
+            'title'=>'',
+            'content'=>'',
+            'color'=>'#A0DBA4',
+            'timeout'=>3000,
+            'icon'=>'fa fa-thumbs-up'
+        );
+        if(!is_array($message))
+        {
+          $message['content']=$message;
+        }
+        $message = array_merge($defaults,$message);
         $this->messages[]=$message;
     }
 
@@ -31,7 +55,43 @@ class Session
         return $messages;
     }
 
-    public function queueCookie($type,$value,$remember=true,$delete=false)
+    public function hasFlashMessage()
+    {
+        //see if there is a flash message in the session
+        if(count($this->messages)>0)
+        {
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
+    public function showFlashMessages()
+    {
+        if(count($this->messages)>0)
+        {
+            print "<script>\n";
+            foreach($this->messages as $singleMessage) {
+            if ($singleMessage['timeout'] == 'none'){$singleMessage['timeout']=0;}
+                print "
+    var smallMessage= {
+        title: \"$singleMessage[title]\",
+        content: \"$singleMessage[content]\",
+        color: \"$singleMessage[color]\",
+        timeout: $singleMessage[timeout],
+        icon: \"$singleMessage[icon]\",
+        type: \"smallBox\"
+    };
+    showMessage(smallMessage);
+   ";
+            }
+            print "</script>\n";
+            $this->messages=[];
+        }
+    }
+
+    public function setCookie($type,$value,$remember=true,$delete=false)
     {
         if($remember)
         {
@@ -40,24 +100,24 @@ class Session
             $time=0; // set for session only
         }
         if($delete){$time=time()-3600;}
-        $cookie[$type]=array('value'=>$value,'time'=>$time);
-        $this->cookies=array_merge($this->cookies,$cookie);
+        $cookie = array('type'=>$type,'value'=>$value,'time'=>$time);
+        $this->cookies[]=$cookie;
     }
 
-    public function setCookies()
+    private function setCookies()
     {
         if(count($this->cookies)>0)
         {
-            foreach($this->cookies as $cookieType=>$cookieValues)
+            foreach($this->cookies as $cookie)
             {
-                switch($cookieType)
+                switch($cookie['type'])
                 {
                     case 'user':
-                        setcookie('mango_user',$cookieValues['value'],$cookieValues['time']);
+                        setcookie('mango_user',$cookie['value'],$cookie['time'], '/');
                         break;
 
                     case 'site':
-                        setcookie('mango_current_site',$cookieValues['value'],$cookieValues['time']);
+                        setcookie('mango_current_site',$cookie['value'],$cookie['time'], '/');
                         break;
 
                 }

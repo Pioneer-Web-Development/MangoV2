@@ -1,5 +1,5 @@
 <?php
-global $messenger;
-if ($messenger->hasFlashMessage()){
-    $messenger->showFlashMessages();
+global $session;
+if ($session->hasFlashMessage()){
+    $session->showFlashMessages();
 }

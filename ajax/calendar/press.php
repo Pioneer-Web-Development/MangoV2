@@ -14,11 +14,24 @@ function page()
     $start=$_POST['start']." 00:01";
     $end=$_POST['end']." 23:59";
 
-    $jobs = $db->from('jobs')->where_in('site_id',$user->sites())->where_in('pub_id',$user->publications())->between('startdatetime',$start,$end)->fetch();
+    $data = $db->from('jobs')->where_in('site_id',$user->sites('list'))->where_in('pub_id',$user->publications('list'))->between('startdatetime',$start,$end)->fetch();
 
-    $jobs['sql']=$db->last_query();
+    $db->reset_where();
+    $pubs = $db->from('publications')->fetch();
 
-
+    $jobs=[];
+    if(count($data)>0)
+    {
+        foreach($data as $job)
+        {
+            $jobs[]=array('id'=>$job['id'],
+                          'title'=>"Press Job",
+                          'start'=>$job['startdatetime'],
+                          'end'=>$job['enddatetime'],
+                          'color'=>
+                );
+        }
+    }
     echo json_encode($jobs);
 
 }

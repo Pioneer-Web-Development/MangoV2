@@ -9,7 +9,7 @@ function page()
     global $user,$session;
     $session->loggedin = false;
     $session->user_token = '';
-    $session->queueCookie('user',0,false,true);
+    $session->setCookie('user',0,false,true);
     if($user != Null)
         $user->logout();
     session_unset();

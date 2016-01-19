@@ -37,8 +37,12 @@
     <link rel="apple-touch-startup-image" href="/public/img/splash/ipad-portrait.png" media="screen and (min-device-width: 481px) and (max-device-width: 1024px) and (orientation:portrait)">
     <link rel="apple-touch-startup-image" href="/public/img/splash/iphone.png" media="screen and (max-device-width: 320px)">
     <script>
-        //set up some global JS variables passed in from Laravel
+        //set up some global JS variables passed in from php
         var menupath='<?php echo $GLOBALS['menuPath'] ?>';
     </script>
-    <?php include $_SERVER['DOCUMENT_ROOT'] . '/templates/partials/pusher-head.php' ?>
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/templates/partials/pusher-head.php' ;
+    if(DISPLAY_DEBUG) {
+        echo $GLOBALS['debugbarRenderer']->renderHead();
+    }
+    ?>
 </head>

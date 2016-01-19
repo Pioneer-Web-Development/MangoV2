@@ -45,7 +45,7 @@ function showMessage(message)
             content: message.content,
             color: message.color,
             timeout: message.timeout,
-            icon: message.icon
+            iconSmall: message.icon
         });
     } else {
         alert(message);

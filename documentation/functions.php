@@ -72,11 +72,12 @@ function nav()
             <div id="navbar" class="navbar-collapse collapse">
                 <ul class="nav navbar-nav">
                     <li class="active"><a href="/">Back to Mango</a></li>
-                    <li><a href="#about">About</a></li>
-                    <li><a href="#contact">Contact</a></li>
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Coding <span class="caret"></span></a>
                         <ul class="dropdown-menu">
+                            <li><a href="phpLibraries.php">PHP Libraries</a></li>
+                            <li><a href="javascriptLibraries.php">Javascript Libraries</a></li>
+                            <li><a href="forms.php">Form Class</a></li>
                             <li><a href="databaseManual.php">Database Layer</a></li>
                             <li><a href="migration.php">Migration from V1 to V2</a></li>
                         </ul>

@@ -1,7 +1,7 @@
 <?php
   //bring in some global variables for this partial
 
-global $sites, $user;
+global $sites, $user, $session;
 
 ?>
 <!-- HEADER -->
@@ -14,7 +14,7 @@ global $sites, $user;
         Suggestion: You may want to set a flag when this happens to tick off all checked messages / notifications -->
         <span id="activity" class="activity-dropdown"> <i class="fa fa-envelope"></i>
             <?php if(isset($user) && $user->messageCount>0) { ?>
-                <b class="badge"> <?php  echo  $user->messageCount ?> </b>
+                <b class="badge"><?php echo $user->messageCount ?> </b>
             <?php } ?>
         </span>
     </div>
@@ -59,29 +59,16 @@ global $sites, $user;
             <span> <a href="javascript:void(0);" data-action="launchFullscreen" title="Full Screen"><i class="fa fa-arrows-alt"></i></a> </span>
         </div>
         <!-- end fullscreen button -->
-
-
         <ul class="header-dropdown-list hidden-xs">
             <li>
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown"> <span> Active site is: <?php  echo $sites[$session->current_site] ?></span> <i class="fa fa-angle-down"></i> </a>
                 <ul class="dropdown-menu pull-right">
-                    <?php
-                    foreach($user->sites as $site){
-                        if($site->id==0) { ?>
                     <li>
-                        <a href="/setsite/<?php  echo  $site->id  ?>"> <?php  echo  $site->name ?></a>
-                    </li>
-                    <?php //foreach($user->allSites() as $site) {
-                        if($site->id!=1) { ?>
+                        <a href="/handlers/setSite.php?siteID=0">Global</a>
+                    </li><?php
+                    foreach($sites as $siteID=>$siteName){?>
                     <li>
-                        <a href="/setsite/<?php  echo  $site->id  ?>"> <?php  echo  $site->name ?></a>
-                    </li>
-                    <?php }
-                    }
-                        break;
-                    //} else { ?>
-                    <li>
-                        <a href="/setsite/<?php  echo  $site->id  ?>"> <?php  echo  $site->name ?></a>
+                        <a href="/handlers/setSite.php?siteID=<?php echo $siteID  ?>"> <?php  echo  $siteName ?></a>
                     </li>
                     <?php }
                     //}

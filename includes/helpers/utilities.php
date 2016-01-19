@@ -18,6 +18,7 @@ function redirect($url) {
     if (!headers_sent())
         header('Location: '.$url);
     else {
+
         echo '<script type="text/javascript">';
         echo 'document.location.href="'.$url.'";';
         echo '</script>';

@@ -5,6 +5,7 @@
     tagClass: function(item) {
       return 'label label-info';
     },
+    focusClass: 'focus',
     itemValue: function(item) {
       return item ? item.toString() : item;
     },
@@ -21,7 +22,7 @@
     confirmKeys: [13, 44],
     delimiter: ',',
     delimiterRegex: null,
-    cancelConfirmKeysOnEmpty: true,
+    cancelConfirmKeysOnEmpty: false,
     onTagExists: function(item, $tag) {
       $tag.hide().fadeIn();
     },
@@ -33,6 +34,7 @@
    * Constructor function
    */
   function TagsInput(element, options) {
+    this.isInit = true;
     this.itemsArray = [];
 
     this.$element = $(element);
@@ -50,6 +52,7 @@
     this.$element.before(this.$container);
 
     this.build(options);
+    this.isInit = false;
   }
 
   TagsInput.prototype = {
@@ -136,8 +139,14 @@
       self.findInputWrapper().before($tag);
       $tag.after(' ');
 
+      // Check to see if the tag exists in its raw or uri-encoded form
+      var optionExists = (
+        $('option[value="' + encodeURIComponent(itemValue) + '"]', self.$element).length ||
+        $('option[value="' + htmlEncode(itemValue) + '"]', self.$element).length
+      );
+
       // add <option /> if item represents a value not present in one of the <select />'s options
-      if (self.isSelect && !$('option[value="' + encodeURIComponent(itemValue) + '"]',self.$element)[0]) {
+      if (self.isSelect && !optionExists) {
         var $option = $('<option selected>' + htmlEncode(itemText) + '</option>');
         $option.data('item', item);
         $option.attr('value', itemValue);
@@ -151,7 +160,16 @@
       if (self.options.maxTags === self.itemsArray.length || self.items().toString().length === self.options.maxInputLength)
         self.$container.addClass('bootstrap-tagsinput-max');
 
-      self.$element.trigger($.Event('itemAdded', { item: item, options: options }));
+      // If using typeahead, once the tag has been added, clear the typeahead value so it does not stick around in the input.
+      if ($('.typeahead, .twitter-typeahead', self.$container).length) {
+        self.$input.typeahead('val', '');
+      }
+
+      if (this.isInit) {
+        self.$element.trigger($.Event('itemAddedOnInit', { item: item, options: options }));
+      } else {
+        self.$element.trigger($.Event('itemAdded', { item: item, options: options }));
+      }
     },
 
     /**
@@ -362,6 +380,15 @@
           }, self));
         }
 
+      // Toggle the 'focus' css class on the container when it has focus
+      self.$container.on({
+        focusin: function() {
+          self.$container.addClass(self.options.focusClass);
+        },
+        focusout: function() {
+          self.$container.removeClass(self.options.focusClass);
+        },
+      });
 
       self.$container.on('keydown', 'input', $.proxy(function(event) {
         var $input = $(event.target),
@@ -441,7 +468,7 @@
 
             // If the field is empty, let the event triggered fire as usual
             if (self.options.cancelConfirmKeysOnEmpty === false) {
-               event.preventDefault();
+                event.preventDefault();
             }
          }
 

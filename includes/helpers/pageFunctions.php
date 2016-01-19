@@ -27,7 +27,7 @@ function includeScripts()
 /*
  * This function does all the clean up, closes files, discards unneeded memory, etc.
  */
-function page_cleanup($redirect='')
+function page_cleanup($nextURL='')
 {
     global $ajax, $post, $baseDir, $logger, $session;
 
@@ -36,9 +36,9 @@ function page_cleanup($redirect='')
         include($baseDir."/templates/partials/debugger.php");
     }
     $_SESSION = $session->close();
-    if($redirect!='')
+    if($nextURL!='')
     {
-        redirect($redirect);
+        redirect($nextURL);
     }
 }
 

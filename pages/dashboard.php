@@ -5,8 +5,20 @@ include("../includes/bootstrap.php");
 
 function page()
 {
-    global $db,$user,$session;
+    global $db,$user,$session, $sites;
 
+    /*
+     * Lets send a test message to the logged in user
+    $message = new Message();
+    $message->to(1);
+    $message->from(0); //0 will be "system";
+    $message->setSubject('This is a second test message');
+    $message->setBody("This would be an actual message had this not been a test.");
+    $message->send();
+
+
+    */
+    print "Set site is ".$session->current_site;
     ?>
     <h3>Dashboard</h3>
     <section id="widget-grid" class="">
@@ -36,6 +48,15 @@ function page()
                     $data=$db->select('firstname,lastname')->from('users')->limit(10)->fetch();
                     $test2->addTable($headers,$data);
                     $test2->render();
+
+                    print "Cookies<br>";
+                    if (isset($_COOKIE)) {
+                        foreach ($_COOKIE as $name => $value) {
+                            $name = htmlspecialchars($name);
+                            $value = htmlspecialchars($value);
+                            echo "$name : $value <br />\n";
+                        }
+                    }
                     ?>
                 </article>
 
@@ -43,12 +64,8 @@ function page()
                     <?php
                     $test3 = new Widget;
                     $test3->setTitle('My third widget');
-                    $this->addContent("<p>Sites allowed:</p>".$user->sites('list'));
+                    $test3->addContent("<p>Sites allowed:</p>".$user->sites('list'));
                     $test3->render();
-
-                    $test4 = new Widget;
-                    $test4->setTitle('My fourth widget');
-                    $test4->render();
 
                     ?>
                 </article>

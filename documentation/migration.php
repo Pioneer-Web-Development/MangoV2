@@ -66,6 +66,30 @@ page_header() ?>
                 </ul>
 
             </ul>
+            <ul class="list-unstyled">
+                user_messages
+                <ul>Add Fields
+                    <li>Add field: id | int | auto-increment | primary</li>
+                    <li>Add field: user_id | int | nullable</li>
+                    <li>Add field: create_datetime | datetime | nullable</li>
+                    <li>Add field: updated_datetime | datetime | nullable</li>
+                    <li>Add field: received_datetime | datetime | nullable</li>
+                    <li>Add field: read_datetime | datetime | nullable</li>
+                    <li>Add field: status | int | default(0)</li>
+                    <li>Add field: sender_id | int | default(0)</li>
+                    <li>Add field: message_type | varchar(50) | enum vales (message, chat, alert,job_update</li>
+                    <li>Add field: message_subject | varchar(255) | </li>
+                    <li>Add field: message_body | text | </li>
+                    <li>Add field: message_priority | tinyint(1) | default 0</li>
+
+                </ul>
+                <ul>Change Fields
+                </ul>
+                <ul>Remove Fields
+
+                </ul>
+
+            </ul>
         </li>
     </ul>
 </div>
